@@ -1,0 +1,24 @@
+[package]
+name = "hello_blea"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+readme = "README.md"
+keywords = ["bluetooth", "BLE"]
+categories = ["hardware-support"]
+
+
+[dependencies]
+hex = "0.4.3"
+log = "0.4.17"
+uuid = "1.2.2"
+futures = "0.3.25"
+byteorder = "1.4.3"
+enum-iterator = "1.2.0"
+pretty_env_logger = "0.4.0"
+phf = { version = "0.11", features = ["macros"] }
+btleplug = { version = "0.10", features = ["serde"] }
+tokio = { version = "1.22.0", features = ["macros", "rt", "sync", "rt-multi-thread"] }
+tokio-stream = { version = "0.1.11", features = ["sync"] }
