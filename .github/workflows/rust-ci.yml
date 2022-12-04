@@ -58,9 +58,19 @@ jobs:
           token: ${{ github.token }}
           args: --all-features
 
+      - name: 📚️ Install target
+        if: ${{ runner.os == 'macOS' }}
+        run: |
+          rustup update
+          rustup target add aarch64-apple-darwin
+
       - name: 📦 Build
         run: |
           cargo build --all --release
+
+      - name: 📦 Build macOS arm64
+        if: ${{ runner.os == 'macOS' }}
+        run: cargo build --all --release --target=aarch64-apple-darwin
 
       - name: ✂️ Strip symbols
         if: ${{ runner.os != 'Windows' }}
@@ -81,62 +91,44 @@ jobs:
           path: target/release/${{ env.PROJECT_NAME }}.exe
           retention-days: 7
 
-  build-macos-arm:
-    runs-on: macos-11
-    steps:
-      - name: 🌩️ Checkout repository
-        uses: actions/checkout@v3
-
-      - name: 🔧 Cache packages
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-
-      - name: 📚️ Install target
-        run: |
-          rustup update
-          rustup target add aarch64-apple-darwin
-
-      - name: 📦 Build
-        run: cargo build --all --release --target=aarch64-apple-darwin
-
-      - run: ls target/release/
-
       - uses: actions/upload-artifact@v3
+        if: ${{ runner.os == 'macOS' }}
         with:
           name: ${{ runner.os }}_arm64
           path: target/aarch64-apple-darwin/release/${{ env.PROJECT_NAME }}
           retention-days: 7
 
   release:
-    needs: [ build, build-macos-arm ]
+    needs: [ build ]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
       - name: 🌩️ Checkout repository
         uses: actions/checkout@v3
 
-      - uses: actions/download-artifact@v3
+      - name: 🐧 Download linux amd64 artifact
+        uses: actions/download-artifact@v3
         with:
           name: Linux_amd64
+          path: releases/Linux_amd64/
 
-      - uses: actions/download-artifact@v3
+      - name: 🍏 Download mac amd64 artifact
+        uses: actions/download-artifact@v3
         with:
           name: macOS_amd64
+          path: releases/macOS_amd64/
 
-      - uses: actions/download-artifact@v3
+      - name: 🍎 Download mac amd64 artifact
+        uses: actions/download-artifact@v3
         with:
           name: macOS_arm64
+          path: releases/macOS_arm64/
 
-      - uses: actions/download-artifact@v3
+      - name: 🪟Download windows amd64 artifact
+        uses: actions/download-artifact@v3
         with:
           name: Windows_amd64
+          path: releases/Windows_amd64/
 
       - run: ls
 
@@ -144,9 +136,9 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            Linux_amd64
-            Windows_amd64
-            macOS_amd64
-            macOS_arm64
+            releases/Linux_amd64/${{ env.PROJECT_NAME }}
+            releases/Windows_amd64/${{ env.PROJECT_NAME }}.exe
+            releases/macOS_amd64/${{ env.PROJECT_NAME }}
+            releases/macOS_arm64/${{ env.PROJECT_NAME }}
         env:
           GITHUB_TOKEN: ${{ github.token }}
