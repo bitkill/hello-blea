@@ -112,11 +112,15 @@ jobs:
           name: Linux_amd64
           path: releases/Linux_amd64/
 
+      - run: tar -czf releases/Linux_amd64.tar.gz releases/Linux_amd64
+
       - name: 🍏 Download mac amd64 artifact
         uses: actions/download-artifact@v3
         with:
           name: macOS_amd64
           path: releases/macOS_amd64/
+
+      - run: tar -czf releases/macOS_amd64.tar.gz releases/macOS_amd64
 
       - name: 🍎 Download mac amd64 artifact
         uses: actions/download-artifact@v3
@@ -124,21 +128,23 @@ jobs:
           name: macOS_arm64
           path: releases/macOS_arm64/
 
+      - run: tar -czf releases/macOS_arm64.tar.gz releases/macOS_arm64
+
       - name: 🪟Download windows amd64 artifact
         uses: actions/download-artifact@v3
         with:
           name: Windows_amd64
           path: releases/Windows_amd64/
 
-      - run: ls
+      - run: zip releases/Windows_amd64.zip releases/Windows_amd64
 
       - name: 🚀 Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            releases/Linux_amd64/${{ env.PROJECT_NAME }}
-            releases/Windows_amd64/${{ env.PROJECT_NAME }}.exe
-            releases/macOS_amd64/${{ env.PROJECT_NAME }}
-            releases/macOS_arm64/${{ env.PROJECT_NAME }}
+            releases/Linux_amd64.tar.gz
+            releases/macOS_amd64.tar.gz
+            releases/macOS_arm64.tar.gz
+            releases/Windows_amd64.zip
         env:
           GITHUB_TOKEN: ${{ github.token }}
