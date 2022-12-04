@@ -19,13 +19,16 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        os:
+          - ubuntu-latest
+          - windows-latest
+          - macos-latest
 
     runs-on: ${{ matrix.os }}
 
     steps:
       - name: 🌩️ Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: 🧰 Install dependencies
         if: ${{ runner.os == 'Linux' }}
@@ -47,6 +50,14 @@ jobs:
       - name: 🔩Test
         run: cargo test
 
+      - name: 🔍 Run clippy
+        uses: actions-rs/clippy-check@v1
+        if: ${{ runner.os == 'Linux' }}
+        with:
+          name: clippy ${{ matrix.os }}
+          token: ${{ github.token }}
+          args: --all-features
+
       - name: 📦 Build
         run: |
           cargo build --all --release
@@ -56,32 +67,25 @@ jobs:
         run: |
           strip target/release/${PROJECT_NAME}
 
-      - name: 🚂 Move target to new name
-        run: |
-          mv target/release/${PROJECT_NAME} target/release/${PROJECT_NAME}_${{ runner.os }}_amd64
-
-      - name: 🔍 Run clippy
-        uses: actions-rs/clippy-check@v1
-        if: ${{ runner.os == 'Linux' }}
+      - uses: actions/upload-artifact@v3
+        if: ${{ runner.os != 'Windows' }}
         with:
-          name: clippy ${{ matrix.os }}
-          token: ${{ github.token }}
-          args: --all-features
+          name: ${{ runner.os }}_amd64
+          path: target/release/${{ env.PROJECT_NAME }}
+          retention-days: 7
 
-      - name: 🚀 Release
-        uses: softprops/action-gh-release@v1
-        if: startsWith(github.ref, 'refs/tags/')
+      - uses: actions/upload-artifact@v3
+        if: ${{ runner.os == 'Windows' }}
         with:
-          files: |
-            target/release/${PROJECT_NAME}_${{ runner.os }}_amd64
-        env:
-          GITHUB_TOKEN: ${{ github.token }}
+          name: ${{ runner.os }}_amd64
+          path: target/release/${{ env.PROJECT_NAME }}.exe
+          retention-days: 7
 
   build-macos-arm:
     runs-on: macos-11
     steps:
       - name: 🌩️ Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
       - name: 🔧 Cache packages
         uses: actions/cache@v3
@@ -102,4 +106,47 @@ jobs:
       - name: 📦 Build
         run: cargo build --all --release --target=aarch64-apple-darwin
 
+      - run: ls target/release/
 
+      - uses: actions/upload-artifact@v3
+        with:
+          name: ${{ runner.os }}_arm64
+          path: target/aarch64-apple-darwin/release/${{ env.PROJECT_NAME }}
+          retention-days: 7
+
+  release:
+    needs: [ build, build-macos-arm ]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: 🌩️ Checkout repository
+        uses: actions/checkout@v3
+
+      - uses: actions/download-artifact@v3
+        with:
+          name: Linux_amd64
+
+      - uses: actions/download-artifact@v3
+        with:
+          name: macOS_amd64
+
+      - uses: actions/download-artifact@v3
+        with:
+          name: macOS_arm64
+
+      - uses: actions/download-artifact@v3
+        with:
+          name: Windows_amd64
+
+      - run: ls
+
+      - name: 🚀 Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            Linux_amd64
+            Windows_amd64
+            macOS_amd64
+            macOS_arm64
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
