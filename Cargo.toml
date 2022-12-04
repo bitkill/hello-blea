@@ -1,5 +1,5 @@
 [package]
-name = "hello_blea"
+name = "hello-blea"
 version = "0.1.0"
 edition = "2021"
 

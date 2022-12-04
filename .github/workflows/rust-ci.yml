@@ -1,0 +1,105 @@
+name: rust-ci
+
+on:
+  push:
+    branches: [ main ]
+    tags: [ '*' ]
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: write
+  checks: write
+
+env:
+  CARGO_TERM_COLOR: always
+  PROJECT_NAME: hello-blea
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: 🌩️ Checkout repository
+        uses: actions/checkout@v2
+
+      - name: 🧰 Install dependencies
+        if: ${{ runner.os == 'Linux' }}
+        run: |
+          sudo apt-get update
+          sudo apt-get install libdbus-1-dev
+
+      - name: 🔧 Cache packages
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: 🔩Test
+        run: cargo test
+
+      - name: 📦 Build
+        run: |
+          cargo build --all --release
+
+      - name: ✂️ Strip symbols
+        if: ${{ runner.os != 'Windows' }}
+        run: |
+          strip target/release/${PROJECT_NAME}
+
+      - name: 🚂 Move target to new name
+        run: |
+          mv target/release/${PROJECT_NAME} target/release/${PROJECT_NAME}_${{ runner.os }}_amd64
+
+      - name: 🔍 Run clippy
+        uses: actions-rs/clippy-check@v1
+        if: ${{ runner.os == 'Linux' }}
+        with:
+          name: clippy ${{ matrix.os }}
+          token: ${{ github.token }}
+          args: --all-features
+
+      - name: 🚀 Release
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: |
+            target/release/${PROJECT_NAME}_${{ runner.os }}_amd64
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+
+  build-macos-arm:
+    runs-on: macos-11
+    steps:
+      - name: 🌩️ Checkout repository
+        uses: actions/checkout@v2
+
+      - name: 🔧 Cache packages
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: 📚️ Install target
+        run: |
+          rustup update
+          rustup target add aarch64-apple-darwin
+
+      - name: 📦 Build
+        run: cargo build --all --release --target=aarch64-apple-darwin
+
+
