@@ -7,7 +7,7 @@ use btleplug::api::{bleuuid::BleUuid, Central, CentralEvent, Manager as _, ScanF
 use btleplug::platform::{Adapter, Manager};
 use futures::stream::StreamExt;
 use std::error::Error;
-use log::{debug, info};
+use log::{debug, info, LevelFilter};
 use crate::models::{Parser};
 
 
@@ -19,7 +19,15 @@ async fn get_central(manager: &Manager) -> Adapter {
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+
+    // set default log level to info
+    if let Err(_) = std::env::var("RUST_LOG") {
+        std::env::set_var("RUST_LOG", "info");
+    }
+
     pretty_env_logger::init();
+
+    info!("Starting up hello-blea.");
 
     let parsers = Vec::from([
         parsers::xiaomi::get_parser(),
