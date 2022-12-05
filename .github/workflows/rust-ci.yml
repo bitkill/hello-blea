@@ -183,5 +183,6 @@ jobs:
       - name: 📎 Run clippy
         uses: actions-rs/clippy-check@v1
         with:
+          name: clippy on linux
           token: ${{ github.token }}
           args: --all-features
