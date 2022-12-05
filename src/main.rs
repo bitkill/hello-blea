@@ -3,11 +3,12 @@
 mod models;
 mod parsers;
 
+use std::{env, process};
 use btleplug::api::{bleuuid::BleUuid, Central, CentralEvent, Manager as _, ScanFilter};
 use btleplug::platform::{Adapter, Manager};
 use futures::stream::StreamExt;
 use std::error::Error;
-use log::{debug, info, LevelFilter};
+use log::{debug, info};
 use crate::models::{Parser};
 
 
@@ -73,7 +74,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 for parser in &parsers {
                     for data in &service_data {
                         if parser.is_parseable(&data.0) {
-                            let _ = parser.parse(data.1.clone());
+                            let parsed = parser.parse(data.1.clone());
                         }
                     }
                 }

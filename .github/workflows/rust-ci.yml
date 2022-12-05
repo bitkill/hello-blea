@@ -23,6 +23,20 @@ jobs:
           - ubuntu-latest
           - windows-latest
           - macos-latest
+        # https://docs.github.com/en/actions/using-jobs/using-a-matrix-for-your-jobs#expanding-or-adding-matrix-configurations
+        include:
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: armv7-unknown-linux-gnueabihf
+            os: ubuntu-latest
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+          - target: x86_64-apple-darwin
+            os: macos-latest
+          - target: aarch64-apple-darwin
+            os: macos-latest
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
 
     runs-on: ${{ matrix.os }}
 
@@ -30,11 +44,19 @@ jobs:
       - name: 🌩️ Checkout repository
         uses: actions/checkout@v3
 
-      - name: 🧰 Install dependencies
+      - name: 🧰 Install linux dependencies
         if: ${{ runner.os == 'Linux' }}
         run: |
           sudo apt-get update
           sudo apt-get install libdbus-1-dev
+
+      - name: 📚️ Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          target: ${{ matrix.target }}
+          override: true
 
       - name: 🔧 Cache packages
         uses: actions/cache@v3
@@ -50,101 +72,116 @@ jobs:
       - name: 🔩Test
         run: cargo test
 
-      - name: 🔍 Run clippy
-        uses: actions-rs/clippy-check@v1
-        if: ${{ runner.os == 'Linux' }}
-        with:
-          name: clippy ${{ matrix.os }}
-          token: ${{ github.token }}
-          args: --all-features
-
-      - name: 📚️ Install target
-        if: ${{ runner.os == 'macOS' }}
-        run: |
-          rustup update
-          rustup target add aarch64-apple-darwin
-
       - name: 📦 Build
         run: |
-          cargo build --all --release
+          cargo build --release --locked --target ${{ matrix.target }}
 
-      - name: 📦 Build macOS arm64
-        if: ${{ runner.os == 'macOS' }}
-        run: cargo build --all --release --target=aarch64-apple-darwin
-
-      - name: ✂️ Strip symbols
+      - name: 🗜️ Tarball release
         if: ${{ runner.os != 'Windows' }}
         run: |
-          strip target/release/${PROJECT_NAME}
+          tar czf ${{ env.PROJECT_NAME }}.tar.gz -C target/${{ matrix.target }}/release/ ${{ env.PROJECT_NAME }}
 
-      - uses: actions/upload-artifact@v3
-        if: ${{ runner.os != 'Windows' }}
-        with:
-          name: ${{ runner.os }}_amd64
-          path: target/release/${{ env.PROJECT_NAME }}
-          retention-days: 7
-
-      - uses: actions/upload-artifact@v3
+      - name: 🗜️ Tarball release (Windows)
         if: ${{ runner.os == 'Windows' }}
-        with:
-          name: ${{ runner.os }}_amd64
-          path: target/release/${{ env.PROJECT_NAME }}.exe
-          retention-days: 7
+        run: |
+          tar czf ${{ env.PROJECT_NAME }}.tar.gz -C target/${{ matrix.target }}/release/ ${{ env.PROJECT_NAME }}.exe
 
-      - uses: actions/upload-artifact@v3
-        if: ${{ runner.os == 'macOS' }}
+      - name: 🌈 Upload binary
+        uses: actions/upload-artifact@v2
         with:
-          name: ${{ runner.os }}_arm64
-          path: target/aarch64-apple-darwin/release/${{ env.PROJECT_NAME }}
+          name: ${{ env.PROJECT_NAME }}-${{ matrix.target }}.tar.gz
+          path: ${{ env.PROJECT_NAME }}.tar.gz
           retention-days: 7
 
   release:
     needs: [ build ]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
+    outputs:
+      upload_url: ${{ steps.create_release.outputs.upload_url }}
     steps:
       - name: 🌩️ Checkout repository
         uses: actions/checkout@v3
 
-      - name: 🐧 Download linux amd64 artifact
-        uses: actions/download-artifact@v3
-        with:
-          name: Linux_amd64
-          path: releases/Linux_amd64/
-
-      - run: tar -czf releases/Linux_amd64.tar.gz releases/Linux_amd64
-
-      - name: 🍏 Download mac amd64 artifact
-        uses: actions/download-artifact@v3
-        with:
-          name: macOS_amd64
-          path: releases/macOS_amd64/
-
-      - run: tar -czf releases/macOS_amd64.tar.gz releases/macOS_amd64
-
-      - name: 🍎 Download mac amd64 artifact
-        uses: actions/download-artifact@v3
-        with:
-          name: macOS_arm64
-          path: releases/macOS_arm64/
-
-      - run: tar -czf releases/macOS_arm64.tar.gz releases/macOS_arm64
-
-      - name: 🪟Download windows amd64 artifact
-        uses: actions/download-artifact@v3
-        with:
-          name: Windows_amd64
-          path: releases/Windows_amd64/
-
-      - run: zip releases/Windows_amd64.zip releases/Windows_amd64
-
       - name: 🚀 Release
+        id: create_release
         uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            releases/Linux_amd64.tar.gz
-            releases/macOS_amd64.tar.gz
-            releases/macOS_arm64.tar.gz
-            releases/Windows_amd64.zip
         env:
           GITHUB_TOKEN: ${{ github.token }}
+
+  crates_io_publish:
+    name: Publish to crates.io
+    if: ${{ false }} #startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🌩️ Checkout repository
+        uses: actions/checkout@v3
+
+      - name: 🦀 Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+          profile: minimal
+
+      - name: 🔑 Login to crates.io
+        run: cargo login $CRATES_IO_TOKEN
+        env:
+          CRATES_IO_TOKEN: ${{ secrets.CRATES_IO_TOKEN }}
+
+      - name: 🧑‍🚀 Dry run publish
+        run: cargo publish --dry-run
+
+      - name: 🚀 Publish
+        run: cargo publish
+
+  upload_release_assets:
+    name: Upload release assets
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: release
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        target:
+          - aarch64-unknown-linux-gnu
+          - armv7-unknown-linux-gnueabihf
+          - x86_64-unknown-linux-gnu
+          - x86_64-apple-darwin
+          - aarch64-apple-darwin
+          - x86_64-pc-windows-msvc
+    steps:
+      - id: vars
+        run: echo ::set-output name=version::${GITHUB_REF/refs\/tags\//}
+      - uses: actions/download-artifact@v2
+        with:
+          name: ${{ env.PROJECT_NAME }}-${{ matrix.target }}.tar.gz
+      - name: Upload release asset
+        id: upload-release-asset
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ needs.create_release.outputs.upload_url }}
+          asset_path: ./${{ env.PROJECT_NAME }}.tar.gz
+          asset_name: ${{ env.PROJECT_NAME }}-${{ steps.vars.outputs.version }}-${{ matrix.target }}.tar.gz
+          asset_content_type: application/gzip
+
+  clippy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: 🌩 Checkout repository
+        uses: actions/checkout@v2
+
+      - name: 🦀 Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: stable
+          components: clippy
+
+      - name: 📎 Run clippy
+        uses: actions-rs/clippy-check@v1
+        with:
+          token: ${{ github.token }}
+          args: --all-features

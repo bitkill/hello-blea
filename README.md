@@ -14,3 +14,9 @@ the examples included with `btleplug`) enable the Bluetooth permission for your
 terminal. You can do the latter by going to _System Preferences_ → _Security &
 Privacy_ → _Privacy_ → _Bluetooth_, clicking the '+' button, and selecting
 'Terminal' (or iTerm or whichever terminal application you use).
+
+## TODO
+ - Send data to a mqtt server
+ - Cleanup this readme
+ - Generate a mac app (w/`Info.plist`)
+ - Have a demo with the prometheus aggregator & grafana
