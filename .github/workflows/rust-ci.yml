@@ -87,7 +87,7 @@ jobs:
           tar czf ${{ env.PROJECT_NAME }}.tar.gz -C target/${{ matrix.target }}/release/ ${{ env.PROJECT_NAME }}.exe
 
       - name: 🌈 Upload binary
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v3
         with:
           name: ${{ env.PROJECT_NAME }}-${{ matrix.target }}.tar.gz
           path: ${{ env.PROJECT_NAME }}.tar.gz
