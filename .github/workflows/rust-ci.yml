@@ -63,19 +63,13 @@ jobs:
             target/
           key: ${{ runner.os }}-${{ runner.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: 🔩Test
-        uses: actions-rs/cargo@v1
-        with:
-          use-cross: true
-          command: build
-          args: --release --locked --target ${{ matrix.target }}
-
       - name: 📦 Build
-        uses: actions-rs/cargo@v1
-        with:
-          use-cross: true
-          command: test
-          args: --locked --target ${{ matrix.target }}
+        run: |
+          cargo build --release --target ${{ matrix.target }}
+
+      - name: 🔩Test
+        run: |
+          cargo test --target ${{ matrix.target }}        
 
       - name: 🗜️ Tarball release
         if: ${{ runner.os != 'Windows' }}
