@@ -8,7 +8,10 @@ use btleplug::api::{bleuuid::BleUuid, Central, CentralEvent, Manager as _, ScanF
 use btleplug::platform::{Adapter, Manager};
 use futures::stream::StreamExt;
 use std::error::Error;
+use std::time::Duration;
+use dotenv::dotenv;
 use log::{debug, info};
+use rumqttc::{Client, MqttOptions, QoS};
 use crate::models::{Parser};
 
 
@@ -21,10 +24,26 @@ async fn get_central(manager: &Manager) -> Adapter {
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
 
+    dotenv().ok();
+
     // set default log level to info
-    if let Err(_) = std::env::var("RUST_LOG") {
-        std::env::set_var("RUST_LOG", "info");
+    if let Err(_) = env::var("RUST_LOG") {
+        env::set_var("RUST_LOG", "info");
     }
+
+    // get mqtt vars
+    let mqtt_hostname = env::var("MQTT_HOSTNAME").unwrap();
+    let mqtt_client_name = env::var("MACHINE_NAME").unwrap();
+    let mqtt_username = env::var("MQTT_USERNAME").unwrap();
+    let mqtt_password = env::var("MQTT_PASSWORD").unwrap();
+    let mqtt_topic = env::var("MQTT_TOPIC").unwrap();
+
+    let mut mqtt_options = MqttOptions::new(mqtt_client_name, mqtt_hostname, 1883);
+    mqtt_options.set_keep_alive(Duration::from_secs(5));
+    mqtt_options.set_credentials(mqtt_username, mqtt_password);
+
+    let (mut client, mut connection) = Client::new(mqtt_options, 10);
+    client.subscribe("demo/mqtt", QoS::AtMostOnce).unwrap();
 
     pretty_env_logger::init();
 
@@ -75,6 +94,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     for data in &service_data {
                         if parser.is_parseable(&data.0) {
                             let parsed = parser.parse(data.1.clone());
+                            let _ = client.publish(&mqtt_topic, QoS::ExactlyOnce, false, parsed);
                         }
                     }
                 }

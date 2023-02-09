@@ -15,6 +15,7 @@ hex = "0.4.3"
 log = "0.4.17"
 uuid = "1.2.2"
 futures = "0.3.25"
+rumqttc = "0.20.0"
 byteorder = "1.4.3"
 enum-iterator = "1.2.0"
 pretty_env_logger = "0.4.0"
@@ -22,3 +23,4 @@ phf = { version = "0.11", features = ["macros"] }
 btleplug = { version = "0.10", features = ["serde"] }
 tokio = { version = "1.22.0", features = ["macros", "rt", "sync", "rt-multi-thread"] }
 tokio-stream = { version = "0.1.11", features = ["sync"] }
+dotenv = "0.15.0"
