@@ -20,10 +20,13 @@ pub enum Responses {
         pressure: u16
     },
     SoilConductivityResponse {
-        conductivity: u16
+        conductivity: i16
     },
     MoistureResponse {
         moisture: i8
+    },
+    IlluminanceResponse {
+        illuminance: i32
     },
     None {}
 }

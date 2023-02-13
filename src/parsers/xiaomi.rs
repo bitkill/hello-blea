@@ -11,6 +11,7 @@ use rumqttc::Event;
 use crate::parsers::responses::Responses;
 use num_derive::FromPrimitive;
 use num_traits::{FromPrimitive, ToPrimitive};
+use crate::parsers::responses::Responses::SoilConductivityResponse;
 
 static DEVICES: phf::Map<u16, &'static str> = phf_map! {
     0x01AAu16 => "LYWSDCGQ",
@@ -213,6 +214,12 @@ impl Parser for XiaomiParser {
             },
             Some(EventTypes::Humidity) => Responses::HumidityResponse {
                 humidity: (&data[offset+3..offset+5]).read_u16::<LittleEndian>().unwrap() as f32 / 10f32,
+            },
+            Some(EventTypes::Illuminance) => Responses::IlluminanceResponse {
+                illuminance: (&data[offset+3..offset+6]).read_i24::<LittleEndian>().unwrap()
+            },
+            Some(EventTypes::SoilConductivity) => SoilConductivityResponse {
+                conductivity: (&data[offset+3..offset+5]).read_i16::<LittleEndian>().unwrap(),
             },
             _ => Responses::None {}
         };
