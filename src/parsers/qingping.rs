@@ -1,3 +1,4 @@
+use btleplug::platform::PeripheralId;
 use byteorder::{LittleEndian, ReadBytesExt};
 use hex::encode;
 use log::warn;
@@ -5,7 +6,7 @@ use phf::phf_map;
 use uuid::Uuid;
 use crate::models::BleaParserBase;
 use crate::Parser;
-use crate::parsers::qingping::EventTypes::TemperatureAndHumidity;
+use crate::parsers::responses::Responses;
 
 
 static DEVICES: phf::Map<u16, &'static str> = phf_map! {
@@ -15,21 +16,6 @@ static DEVICES: phf::Map<u16, &'static str> = phf_map! {
   0x0cu16 => "CGD1",
   0x10u16 => "CGDK2"
 };
-
-#[derive(Debug)]
-enum Responses {
-    TemperatureAndHumidityResponse {
-        temperature: f32,
-        humidity: f32,
-    },
-    BatteryStatusResponse {
-        charge: u8
-    },
-    PressureStatusResponse {
-        pressure: u16
-    },
-    None {}
-}
 
 enum EventTypes {
     TemperatureAndHumidity = 0x01,
@@ -68,7 +54,7 @@ impl Parser for QingPingParser {
     }
 
     #[allow(unused_variables)]
-    fn parse(&self, data: Vec<u8>) -> &str {
+    fn parse(&self, id : PeripheralId, data: Vec<u8>) -> String {
         let mut base_byte_length = 5;
 
         let mut mac_addr_buffer = Vec::from(&data[base_byte_length..base_byte_length + 6]);
@@ -95,6 +81,6 @@ impl Parser for QingPingParser {
 
 
         warn!("mac: {mac_address} event: {:?}", event);
-        ""
+        serde_json::to_string(&event).unwrap()
     }
 }

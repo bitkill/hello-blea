@@ -3,15 +3,15 @@
 mod models;
 mod parsers;
 
-use std::{env, process};
+use std::{env};
 use btleplug::api::{bleuuid::BleUuid, Central, CentralEvent, Manager as _, ScanFilter};
 use btleplug::platform::{Adapter, Manager};
 use futures::stream::StreamExt;
 use std::error::Error;
 use std::time::Duration;
 use dotenv::dotenv;
-use log::{debug, info};
-use rumqttc::{Client, MqttOptions, QoS};
+use log::{debug, error, info, warn};
+use rumqttc::{AsyncClient, Client, MqttOptions, QoS};
 use crate::models::{Parser};
 
 
@@ -20,34 +20,52 @@ async fn get_central(manager: &Manager) -> Adapter {
     adapters.into_iter().nth(0).unwrap()
 }
 
+fn banner() {
+    const B: &str = r#"
+      ___            __      __        ___
+|__| |__  |    |    /  \ _ \|__) |    |__   /\
+|  | |___ |___ |___ \__/   /|__) |___ |___ /--\
+
+    "#;
+
+    println!("{B}\n");
+}
+
+fn env_or_default(key: &str, default: &str) -> String {
+    if let Err(_) = env::var(key) {
+        return default.to_string()
+    }
+    env::var(key).unwrap()
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
 
     dotenv().ok();
+    banner();
 
     // set default log level to info
     if let Err(_) = env::var("RUST_LOG") {
         env::set_var("RUST_LOG", "info");
     }
 
+    pretty_env_logger::init();
+
     // get mqtt vars
-    let mqtt_hostname = env::var("MQTT_HOSTNAME").unwrap();
-    let mqtt_client_name = env::var("MACHINE_NAME").unwrap();
-    let mqtt_username = env::var("MQTT_USERNAME").unwrap();
-    let mqtt_password = env::var("MQTT_PASSWORD").unwrap();
-    let mqtt_topic = env::var("MQTT_TOPIC").unwrap();
+    let mqtt_hostname = env_or_default("MQTT_HOSTNAME", "localhost");
+    let mqtt_client_name = env_or_default("MACHINE_NAME", "hbela-unknown");
+    let mqtt_username = env_or_default("MQTT_USERNAME", "mosquitto");
+    let mqtt_password = env_or_default("MQTT_PASSWORD", "mosquitto");
+    let mqtt_topic = env_or_default("MQTT_TOPIC", "mosquitto");
 
     let mut mqtt_options = MqttOptions::new(mqtt_client_name, mqtt_hostname, 1883);
     mqtt_options.set_keep_alive(Duration::from_secs(5));
     mqtt_options.set_credentials(mqtt_username, mqtt_password);
 
-    let (mut client, mut connection) = Client::new(mqtt_options, 10);
-    client.subscribe("demo/mqtt", QoS::AtMostOnce).unwrap();
+    let (mut client, mut eventloop) = AsyncClient::new(mqtt_options, 10);
+    client.subscribe("demo/mqtt", QoS::AtMostOnce).await.unwrap();
 
-    pretty_env_logger::init();
-
-    info!("Starting up hello-blea.");
+    info!("Subscribed to mqtt topic, starting up bluetooth reader");
 
     let parsers = Vec::from([
         parsers::xiaomi::get_parser(),
@@ -89,12 +107,17 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 debug!("ManufacturerDataAdvertisement: {:?}, {:?}", id, manufacturer_data);
             }
             CentralEvent::ServiceDataAdvertisement { id, service_data } => {
-                info!("ServiceDataAdvertisement: {:?}, {:?}", id, service_data);
+                //info!("ServiceDataAdvertisement: {:?}, {:?}", id, service_data);
                 for parser in &parsers {
                     for data in &service_data {
                         if parser.is_parseable(&data.0) {
-                            let parsed = parser.parse(data.1.clone());
-                            let _ = client.publish(&mqtt_topic, QoS::ExactlyOnce, false, parsed);
+                            let parsed = parser.parse(id.clone(), data.1.clone());
+                            warn!("{parsed}");
+                            //let _ = client.publish(&MQTT_TOPIC, QoS::ExactlyOnce, false, parsed);
+                            //tokio::spawn(async move {
+                            //let e = client.publish(&mqtt_topic, QoS::ExactlyOnce, false, parsed);
+
+                            //});
                         }
                     }
                 }

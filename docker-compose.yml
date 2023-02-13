@@ -1,0 +1,14 @@
+version: '3.7'
+
+services:
+  # mqtt server
+  mosquitto:
+    image: eclipse-mosquitto:2.0
+    restart: unless-stopped
+    ports:
+      - "1883:1883"
+      - "1884:1884"
+    volumes:
+      - "./mosquitto.conf:/mosquitto/config/mosquitto.conf"
+    environment:
+      TZ: "Europe/London"

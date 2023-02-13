@@ -1,12 +1,16 @@
 use std::collections::HashMap;
-use std::ptr::null;
+use btleplug::platform::PeripheralId;
 use byteorder::{LittleEndian, ReadBytesExt};
-use log::{info, warn};
+use log::{info, log, warn};
 use phf::phf_map;
 use uuid::Uuid;
 use crate::models::{BleaParserBase, Parser};
 use enum_iterator::{all, Sequence};
 use hex::encode;
+use rumqttc::Event;
+use crate::parsers::responses::Responses;
+use num_derive::FromPrimitive;
+use num_traits::{FromPrimitive, ToPrimitive};
 
 static DEVICES: phf::Map<u16, &'static str> = phf_map! {
     0x01AAu16 => "LYWSDCGQ",
@@ -76,6 +80,7 @@ static FRAME_CONTROL_FLAGS : phf::Map<&'static str, u16> = phf_map! {
     "HasBinding" => 1 << 9,
 };
 
+#[derive(FromPrimitive, Debug)]
 enum EventTypes {
     // basic events
     Connection = 0x0001,
@@ -116,6 +121,7 @@ enum EventTypes {
     BodyTemperature = 0x2000,
 }
 
+
 pub struct XiaomiParser {
     base: BleaParserBase,
 }
@@ -141,7 +147,7 @@ impl Parser for XiaomiParser {
         }
         false
     }
-    fn parse(&self, data: Vec<u8>) -> &str {
+    fn parse(&self, id : PeripheralId, data: Vec<u8>) -> String {
         let mut base_byte_length =5;
 
         let mut current = &data[0..4];
@@ -155,8 +161,8 @@ impl Parser for XiaomiParser {
         }
         let version = data[1] >> 4;
 
-        if flags.contains_key(&"Encrypted".to_string()) {
-            return "";
+        if flags.get("Encrypted").unwrap() == &true || flags.get("HasEvent").unwrap() == &false  {
+            return String::from("");
         }
 
         let mut mac_address: String = String::from("");
@@ -167,21 +173,51 @@ impl Parser for XiaomiParser {
 
         warn!("{mac_address}");
 
+        let mut offset = base_byte_length;
+        // get event offset
         if DEVICES.contains_key(&device) {
-            info!("GOT {:?}, v{version} \n flags: {:?}", DEVICES.get(&device), flags);
+            info!("Device: {}, v{version} \n flags: {:?}", DEVICES.get(&device).unwrap(), flags);
 
             if flags.contains_key("HasEvent") {
                 // calculate event offset
-                let mut offset = base_byte_length;
-                if flags.contains_key("HasMacAddress") {
+                if flags.get("HasMacAddress").unwrap() == &true {
                     offset = 11;
                 }
-                if flags.contains_key("HasCapabilities") {
+                if flags.get("HasCapabilities").unwrap() == &true {
                     offset += 1;
                 }
             }
-
         }
-        ""
+
+        // no data
+        if data.len() < offset + 2 {
+            return String::from("{}");
+        }
+
+        // get event type
+        let event_id = (&data[offset..offset+2]).read_u16::<LittleEndian>().unwrap();
+        let event_type = FromPrimitive::from_i32(event_id as i32);
+
+        warn!("{:?}", &event_type);
+
+        let event = match event_type {
+            Some(EventTypes::Battery) => Responses::BatteryStatusResponse {
+                charge: data[offset + 3]
+            },
+            Some(EventTypes::TemperatureAndHumidity) => Responses::TemperatureAndHumidityResponse {
+                temperature: (&data[offset+3..offset+5]).read_i16::<LittleEndian>().unwrap() as f32 / 10f32,
+                humidity: (&data[offset+5..offset+7]).read_u16::<LittleEndian>().unwrap() as f32 / 10f32,
+            },
+            Some(EventTypes::Temperature) => Responses::TemperatureResponse {
+                temperature: (&data[offset+3..offset+5]).read_i16::<LittleEndian>().unwrap() as f32 / 10f32,
+            },
+            Some(EventTypes::Humidity) => Responses::HumidityResponse {
+                humidity: (&data[offset+3..offset+5]).read_u16::<LittleEndian>().unwrap() as f32 / 10f32,
+            },
+            _ => Responses::None {}
+        };
+
+        warn!("mac: {mac_address} event: {:?}", event);
+        serde_json::to_string(&event).unwrap()
     }
 }

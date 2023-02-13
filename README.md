@@ -1,6 +1,6 @@
 # hello-blea - now in rust
 
- > This project is in progress
+ > ⚠️ This project is in progress
 
 This aims to replace my previous project, [blea2mqtt](https://github.com/bitkill/blea2mqtt), with a more stable and compatible bluetooth library.
 
