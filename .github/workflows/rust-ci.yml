@@ -41,7 +41,7 @@ jobs:
 
     steps:
       - name: 🌩️ Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: 🧰 Install linux dependencies
         if: ${{ runner.os == 'Linux' }}
@@ -102,7 +102,7 @@ jobs:
       upload_url: ${{ steps.create_release.outputs.upload_url }}
     steps:
       - name: 🌩️ Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: 🚀 Release
         id: create_release
@@ -117,7 +117,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: 🌩️ Checkout repository
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
 
       - name: 🦀 Install Rust
         uses: actions-rs/toolchain@v1
