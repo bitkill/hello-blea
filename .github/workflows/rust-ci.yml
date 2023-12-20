@@ -154,7 +154,7 @@ jobs:
     steps:
       - id: vars
         run: echo ::set-output name=version::${GITHUB_REF/refs\/tags\//}
-      - uses: actions/download-artifact@v3
+      - uses: actions/download-artifact@v4
         with:
           name: ${{ env.PROJECT_NAME }}-${{ matrix.target }}.tar.gz
       - name: Upload release asset
